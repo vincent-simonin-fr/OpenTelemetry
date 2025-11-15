@@ -9,16 +9,38 @@ public static class Observability
 {
     public static void ConfigureTelemetry(this WebApplicationBuilder builder)
     {
-        var tracingOtlpEndpoint = builder.Configuration["OTLP_ENDPOINT_URL"];
+        var tracingOTlpEndpoint = builder.Configuration["OT_LP_TRACING_ENDPOINT_URL"];
+        var logOTlpEndpoint = builder.Configuration["OT_LP_LOGGING_ENDPOINT_URL"];
 
-        var otel = builder.Services.AddOpenTelemetry();
+        var oTel = builder.Services.AddOpenTelemetry();
 
         // Configure OpenTelemetry Resources with the application name
-        otel.ConfigureResource(resource => resource
+        oTel.ConfigureResource(resource => resource
             .AddService(serviceName: builder.Environment.ApplicationName));
-
+        
+        // If no logs go out to console then the container api w
+        // will not appear in container discover by alloy config
+        builder.Logging.ClearProviders();
+        // Add Logs for ASP.NET Core and export to Loki
+        oTel.WithLogging(logs =>
+            {
+                if (logOTlpEndpoint != null)
+                {
+                    logs.AddOtlpExporter(exporter =>
+                        {
+                            exporter.Endpoint = new Uri(logOTlpEndpoint);
+                        }
+                    );
+                }
+                else
+                {
+                    logs.AddConsoleExporter();
+                }
+            }
+        );
+        
         // Add Metrics for ASP.NET Core and our custom metrics and export to Prometheus
-        otel.WithMetrics(metrics => metrics
+        oTel.WithMetrics(metrics => metrics
             // Metrics provider from OpenTelemetry
             .AddAspNetCoreInstrumentation()
             .AddMeter(Greeter.GreeterMeter.Name)
@@ -31,16 +53,16 @@ public static class Observability
             .AddPrometheusExporter());
 
         // Add Tracing for ASP.NET Core and our custom ActivitySource and export to Jaeger
-        otel.WithTracing(tracing =>
+        oTel.WithTracing(tracing =>
         {
             tracing.AddAspNetCoreInstrumentation();
             tracing.AddHttpClientInstrumentation();
             tracing.AddSource(Greeter.GreeterActivitySource.Name);
-            if (tracingOtlpEndpoint != null)
+            if (tracingOTlpEndpoint != null)
             {
-                tracing.AddOtlpExporter(otlpOptions =>
+                tracing.AddOtlpExporter(oTlpOptions =>
                 {
-                    otlpOptions.Endpoint = new Uri(tracingOtlpEndpoint);
+                    oTlpOptions.Endpoint = new Uri(tracingOTlpEndpoint);
                 });
             }
             else
