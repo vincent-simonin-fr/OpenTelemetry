@@ -19,7 +19,7 @@ app.MapGet("/NestedGreeting", SendNestedGreeting);
 async Task<string> SendGreeting(ILogger<Program> logger)
 {
     // Create a new Activity scoped to the method
-    using var activity = Greeter.GreeterActivitySource.StartActivity("GreeterActivity");
+    using var activity = Greeter.GreeterActivitySource.StartActivity(nameof(Greeter.GreeterActivitySource));
 
     // Log a message
     logger.LogInformation("Sending greeting");
@@ -30,31 +30,32 @@ async Task<string> SendGreeting(ILogger<Program> logger)
     // Add a tag to the Activity
     activity?.SetTag("greeting", "Hello World!");
 
+    await Task.CompletedTask;
     return "Hello World!";
 }
 
-async Task SendNestedGreeting(int nestlevel, HttpContext context, [FromServices] ILogger<Program> logger, [FromServices] IHttpClientFactory clientFactory)
+async Task SendNestedGreeting(int nestLevel, HttpContext context, [FromServices] ILogger<Program> logger, [FromServices] IHttpClientFactory clientFactory)
 {
     // Create a new Activity scoped to the method
-    using var activity = Greeter.GreeterActivitySource.StartActivity("GreeterActivity");
+    using var activity = Greeter.GreeterActivitySource.StartActivity(nameof(Greeter.GreeterActivitySource));
 
-    if (nestlevel <= 5)
+    if (nestLevel <= 5)
     {
         // Log a message
-        logger.LogInformation("Sending greeting, level {nestlevel}", nestlevel);
+        logger.LogInformation("Sending greeting, level {nestlevel}", nestLevel);
 
         // Increment the custom counter
         Greeter.CountGreetings.Add(1);
 
         // Add a tag to the Activity
-        activity?.SetTag("nest-level", nestlevel);
+        activity?.SetTag("nest-level", nestLevel);
 
-        await context.Response.WriteAsync($"Nested Greeting, level: {nestlevel}\r\n");
+        await context.Response.WriteAsync($"Nested Greeting, level: {nestLevel}\r\n");
 
-        if (nestlevel > 0)
+        if (nestLevel > 0)
         {
             var request = context.Request;
-            var url = new Uri($"{request.Scheme}://{request.Host}{request.Path}?nestlevel={nestlevel - 1}");
+            var url = new Uri($"{request.Scheme}://{request.Host}{request.Path}?nestlevel={nestLevel - 1}");
 
             // Makes an http call passing the activity information as http headers
             var nestedResult = await clientFactory.CreateClient().GetStringAsync(url);
@@ -64,7 +65,7 @@ async Task SendNestedGreeting(int nestlevel, HttpContext context, [FromServices]
     else
     {
         // Log a message
-        logger.LogError("Greeting nest level {nestlevel} too high", nestlevel);
+        logger.LogError("Greeting nest level {nestlevel} too high", nestLevel);
         await context.Response.WriteAsync("Nest level too high, max is 5");
     }
 }

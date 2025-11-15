@@ -1,11 +1,13 @@
 ﻿services:
   api:
+    container_name: api
     build:
       context: .
       dockerfile: Dockerfile
     image: telemetry_api:latest
     ports:
       - '8080:8080' # ajustez le port hôte:conteneur si nécessaire
+      - '8081:8081'
     restart: unless-stopped
     networks:
       - open_telemetry
@@ -15,7 +17,7 @@
     ports:
       - '9090:9090'
     volumes:
-      - ./Configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./Configs/Prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     extra_hosts:
       - 'host.containers.internal:host-gateway'
     command:
@@ -58,6 +60,31 @@
       - open_telemetry
     depends_on:
       - api
+  loki:
+    container_name: loki
+    image: grafana/loki:3.5
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./Configs/Loki/config.yml:/etc/loki/local-config.yml
+    command: -config.file=/etc/loki/local-config.yml
+    networks:
+      - open_telemetry
+  alloy:
+    container_name: alloy
+    image: grafana/alloy:latest
+    ports:
+      - 12345:12345
+      - 4320:4317
+      - 4321:4318
+    volumes:
+      - ./Configs/Alloy/config.alloy:/etc/alloy/config.alloy
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    depends_on:
+      - loki
+    networks:
+      - open_telemetry
 
 volumes:
   grafana-storage:
